@@ -30,6 +30,7 @@ void setupWiFi() {
 			storage.getString("WIFI_STA_PASS", "").c_str()
 		);
 	}
+	WiFi.setSleep(false); // disable power save
 	udp.begin(udpLocalPort);
 }
 
