@@ -142,7 +142,7 @@ void interpretControls() {
 }
 
 void controlAttitude() {
-	if (!armed || attitudeTarget.invalid() || thrustTarget < motThrMin) return; // skip attitude control
+	if (!armed || attitudeTarget.invalid() || thrustTarget <= motThrMin) return; // skip attitude control
 
 	const Vector up(0, 0, 1);
 	Vector upActual = Quaternion::rotateVector(up, attitude);
@@ -159,7 +159,7 @@ void controlAttitude() {
 
 
 void controlRates() {
-	if (!armed || ratesTarget.invalid() || thrustTarget < motThrMin) return; // skip rates control
+	if (!armed || ratesTarget.invalid() || thrustTarget <= motThrMin) return; // skip rates control
 
 	Vector error = ratesTarget - rates;
 
