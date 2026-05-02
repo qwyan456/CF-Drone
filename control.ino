@@ -118,7 +118,11 @@ void interpretControls() {
 
 	if (abs(controlYaw) < 0.1) controlYaw = 0; // yaw dead zone
 
-	thrustTarget = mapf(controlThrottle, 0.0f, 1.0f, motThrMin, motThrMax);
+	if (controlThrottle < 0.05f) {
+		thrustTarget = 0.0f;   // 底部死区 → 怠速，PID 不运行
+	} else {
+		thrustTarget = mapf(controlThrottle, 0.05f, 1.0f, motThrMin, motThrMax);
+	}
 
 	if (mode == STAB) {
 		float yawTarget = attitudeTarget.getYaw();
@@ -174,6 +178,11 @@ void controlTorque() {
 
 	if (!armed) {
 		memset(motors, 0, sizeof(motors)); // stop motors if disarmed
+		return;
+	}
+
+	if (thrustTarget < motThrMin) {
+		for (int i = 0; i < 4; i++) motors[i] = motThrMin; // idle thrust
 		return;
 	}
 
