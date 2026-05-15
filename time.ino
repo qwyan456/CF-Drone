@@ -1,5 +1,3 @@
-// Copyright (c) 2023 Oleg Kalachev <okalachev@gmail.com>
-// Repository: https://github.com/okalachev/flix
 // 时间相关函数
 // Time related functions
 

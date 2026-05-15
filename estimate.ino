@@ -1,5 +1,3 @@
-// Copyright (c) 2023 Oleg Kalachev <okalachev@gmail.com>
-// Repository: https://github.com/okalachev/flix
 // 基于陀螺仪和加速度计的姿态计算
 // Attitude estimation from gyro and accelerometer
 

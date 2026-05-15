@@ -1,5 +1,3 @@
-// Copyright (c) 2023 Oleg Kalachev <okalachev@gmail.com>
-// Repository: https://github.com/okalachev/flix
 // 轻量级旋转四元数库
 // Lightweight rotation quaternion library
 

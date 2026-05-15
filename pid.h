@@ -1,5 +1,3 @@
-// Copyright (c) 2023 Oleg Kalachev <okalachev@gmail.com>
-// Repository: https://github.com/okalachev/flix
 // PID控制器实现
 // PID controller implementation
 
