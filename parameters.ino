@@ -132,7 +132,13 @@ void setupParameters() {
 		if (!storage.isKey(parameter.name)) {
 			storage.putFloat(parameter.name, parameter.getValue()); // store default value
 		}
-		parameter.setValue(storage.getFloat(parameter.name, 0));
+		float stored = storage.getFloat(parameter.name, parameter.getValue());
+		// 整型参数若读到 NaN（flash 损坏），回退到代码默认值并重写
+		if (parameter.integer && !isfinite(stored)) {
+			stored = (float)parameter.getValue();
+			storage.putFloat(parameter.name, stored);
+		}
+		parameter.setValue(stored);
 		parameter.cache = parameter.getValue();
 	}
 }
