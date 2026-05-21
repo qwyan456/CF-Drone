@@ -8,6 +8,7 @@
 
 float accWeight = 0.003;
 float levelWeight = 0.0002;
+float levelMaxRate = 3.0; // rad/s, level correction fades out above this rate
 LowPassFilter<Vector> ratesFilter(0.2); // cutoff frequency ~ 40 Hz
 
 void estimate() {
@@ -43,7 +44,10 @@ void applyLevel() {
 	if (landed) return;
 
 	// assume the pilot keeps the drone more or less level in flight
+	float ratesMag = rates.norm();
+	float dynamicWeight = levelWeight * constrain(1.0f - ratesMag / levelMaxRate, 0.0f, 1.0f);
+
 	Vector up = Quaternion::rotateVector(Vector(0, 0, 1), attitude);
-	Vector correction = Vector::rotationVectorBetween(Vector(0, 0, 1), up) * levelWeight;
+	Vector correction = Vector::rotationVectorBetween(Vector(0, 0, 1), up) * dynamicWeight;
 	attitude = Quaternion::rotate(attitude, Quaternion::fromRotationVector(correction));
 }
