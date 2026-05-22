@@ -8,7 +8,7 @@
 
 float accWeight = 0.003;
 float levelWeight = 0.0002;
-float levelMaxRate = 3.0; // rad/s, level correction fades out above this rate
+float levelMaxTilt = radians(30); // rad, level correction fades out at this tilt angle (matches TILT_MAX)
 LowPassFilter<Vector> ratesFilter(0.2); // cutoff frequency ~ 40 Hz
 
 void estimate() {
@@ -44,10 +44,13 @@ void applyLevel() {
 	if (landed) return;
 
 	// assume the pilot keeps the drone more or less level in flight
-	float ratesMag = rates.norm();
-	float dynamicWeight = levelWeight * constrain(1.0f - ratesMag / levelMaxRate, 0.0f, 1.0f);
-
+	// weight fades to zero as tilt approaches levelMaxTilt, so correction
+	// does not fight intentional large-angle flight while still suppressing
+	// gyro drift during normal hover
 	Vector up = Quaternion::rotateVector(Vector(0, 0, 1), attitude);
+	float tilt = acos(constrain(up.z, -1.0f, 1.0f));
+	float dynamicWeight = levelWeight * constrain(1.0f - tilt / levelMaxTilt, 0.0f, 1.0f);
+
 	Vector correction = Vector::rotationVectorBetween(Vector(0, 0, 1), up) * dynamicWeight;
 	attitude = Quaternion::rotate(attitude, Quaternion::fromRotationVector(correction));
 }
