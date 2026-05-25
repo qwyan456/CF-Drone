@@ -14,7 +14,7 @@ LowPassFilter<Vector> ratesFilter(0.2); // cutoff frequency ~ 40 Hz
 void estimate() {
 	applyGyro();
 	applyAcc();
-	applyLevel();
+	// applyLevel();
 }
 
 void applyGyro() {
@@ -40,6 +40,7 @@ void applyAcc() {
 	attitude = Quaternion::rotate(attitude, Quaternion::fromRotationVector(correction));
 }
 
+// 水平修正
 void applyLevel() {
 	if (landed) return;
 

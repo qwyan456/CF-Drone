@@ -14,17 +14,17 @@
 #define PITCHRATE_P 0.05 // 增大P值提高响应速度
 #define PITCHRATE_I 0.2 // 中等I值补偿电机差异
 #define PITCHRATE_D 0.001 // 小D值抑制震荡
-#define PITCHRATE_I_LIM 0.35 // 限制积分积累
-#define ROLLRATE_P 0.06 // 横滚和俯仰使用相同参数
+#define PITCHRATE_I_LIM 0.3 // 限制积分积累
+#define ROLLRATE_P PITCHRATE_P // 横滚和俯仰使用相同参数
 #define ROLLRATE_I PITCHRATE_I 
-#define ROLLRATE_D 0.002 
+#define ROLLRATE_D PITCHRATE_D
 #define ROLLRATE_I_LIM PITCHRATE_I_LIM
 #define YAWRATE_P 0.3 // 偏航需要更高的P值（惯性较小）
 #define YAWRATE_I 0.01 // 中等I值补偿
 #define YAWRATE_D 0.01 // 小D值
 #define YAWRATE_I_LIM 0.3
 // ============== 角度环（外环）参数 ==============
-#define ROLL_P 7 // 较高的P值快速响应
+#define ROLL_P 6 // 较高的P值快速响应
 #define ROLL_I 0 // 角度环通常不需要I项
 #define ROLL_D 0 // 角度环通常不需要D项
 #define PITCH_P ROLL_P // 横滚和俯仰相同
