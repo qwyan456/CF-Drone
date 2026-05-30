@@ -8,9 +8,6 @@
 #define BLINK_PERIOD      500000  // 慢闪：500ms 半周期 → 1 Hz
 #define BLINK_FAST_PERIOD  62500  // 快闪：62.5ms 半周期 → 8 Hz
 
-#ifndef LED_BUILTIN
-#define LED_BUILTIN 2 // for ESP32 Dev Module
-#endif
 
 // ---- 外部依赖声明 ----
 extern bool armed;
@@ -27,7 +24,8 @@ bool isUsingWebRC();
 #endif
 
 void setupLED() {
-	pinMode(LED_BUILTIN, OUTPUT);
+	pinMode(BOARD_LED_PIN, OUTPUT);
+	digitalWrite(BOARD_LED_PIN, BOARD_LED_INVERTED ? HIGH : LOW); // 初始熄灭
 }
 
 void setLED(bool on) {
@@ -35,7 +33,7 @@ void setLED(bool on) {
 	if (on == state) {
 		return; // don't call digitalWrite if the state is the same
 	}
-	digitalWrite(LED_BUILTIN, on ? HIGH : LOW);
+	digitalWrite(BOARD_LED_PIN, (on ^ BOARD_LED_INVERTED) ? HIGH : LOW);
 	state = on;
 }
 

@@ -28,8 +28,10 @@
 #define BOARD_SPI_MOSI     6               // 文档 MOSI = GPIO6
 #define BOARD_SPI_CS       7               // 文档 SS   = GPIO7
 
-// ---- LED：无板载 LED，禁用 ----
-#define BOARD_LED_ENABLED  0
+// ---- LED：GPIO8，蓝色状态灯，低电平有效 ----
+#define BOARD_LED_ENABLED  1
+#define BOARD_LED_PIN      8
+#define BOARD_LED_INVERTED 1               // 低电平点亮
 
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
 // ---------------------- ESP32S3 -------------------------
@@ -53,18 +55,22 @@
 
 // ---- LED：新 PCB 接 GPIO2 普通 LED，驱动方式与 ESP32 相同 ----
 #define BOARD_LED_ENABLED  1
+#define BOARD_LED_PIN      2
+#define BOARD_LED_INVERTED 0
 
 #else  // ---- ESP32 默认配置 ----
 // ---------------------- 默认ESP32 -------------------------
 
-#define BOARD_MOTOR_PINS   {12, 13, 15, 14}  // RL=GPIO12, RR=GPIO13, FR=GPIO15, FL=GPIO14
-#define BOARD_VBAT_ADC_PIN 36
-#define BOARD_RC_SERIAL    Serial2
-#define BOARD_RC_RX_PIN    4
-#define BOARD_SPI_SCK      18
-#define BOARD_SPI_MISO     19
-#define BOARD_SPI_MOSI     23
-#define BOARD_SPI_CS       5
-#define BOARD_LED_ENABLED  1
+#define BOARD_MOTOR_PINS   {12, 13, 15, 14}  // 电机引脚 RL=GPIO12, RR=GPIO13, FR=GPIO15, FL=GPIO14
+#define BOARD_VBAT_ADC_PIN 36              // 电池电压 ADC 引脚（GPIO36，仅输入）
+#define BOARD_RC_SERIAL    Serial2         // SBUS 使用的串口
+#define BOARD_RC_RX_PIN    4               // SBUS RX 引脚（GPIO4）
+#define BOARD_SPI_SCK      18              // SPI 时钟（GPIO18）
+#define BOARD_SPI_MISO     19              // SPI 主入从出（GPIO19）
+#define BOARD_SPI_MOSI     23              // SPI 主出从入（GPIO23）
+#define BOARD_SPI_CS       5               // SPI 片选（GPIO5）
+#define BOARD_LED_ENABLED  1               // 启用板载 LED
+#define BOARD_LED_PIN      2               // LED 引脚（GPIO2）
+#define BOARD_LED_INVERTED 0               // 高电平点亮
 
 #endif
