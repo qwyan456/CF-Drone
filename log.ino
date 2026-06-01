@@ -5,7 +5,7 @@
 #include "util.h"
 
 #define LOG_RATE 100
-#define LOG_DURATION 10
+#define LOG_DURATION 8
 #define LOG_SIZE LOG_DURATION * LOG_RATE
 
 Vector attitudeEuler;
