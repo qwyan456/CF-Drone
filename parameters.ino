@@ -12,6 +12,8 @@ extern int motorPins[4];
 extern int pwmFrequency, pwmResolution, pwmStop, pwmMin, pwmMax;
 extern float motThrMin;
 extern float motThrMax;
+extern float motScale[4];
+extern float motOffset[4];
 extern int mavlinkSysId;
 extern Rate telemetrySlow, telemetryFast;
 extern float rcLossTimeout, descendTime;
@@ -140,6 +142,21 @@ Parameter parameters[] = {
 	// 将归一化油门（0~1）线性映射到电机推力输出范围，保留余量供姿态修正使用。
 	{"MOT_THR_MIN", &motThrMin}, // 推力下限（0~1），摇杆最低位时的电机输出，建议≥0.05 防失速
 	{"MOT_THR_MAX", &motThrMax}, // 推力上限（0~1），摇杆最高位时的电机输出，建议≤0.9 保留姿态修正余量
+
+	// ===== 电机（每电机补偿）=====
+	// 用于补偿马达/桨叶推力不一致：scale 缩放系数调整推力增益，offset 偏移量调整推力基线。
+	// 公式：motor_output = motor_mixer * scale + offset
+	// scale > 1.0 = 该电机推力偏弱需放大；scale < 1.0 = 该电机推力偏强需缩小
+	// offset > 0 = 增加该电机基线推力；offset < 0 = 减少基线推力
+	// 建议步长：scale 0.05，offset 0.01
+	{"MOT_SCALE_FL", &motScale[MOTOR_FRONT_LEFT]},   // 左前电机缩放系数（默认 1.0）
+	{"MOT_SCALE_FR", &motScale[MOTOR_FRONT_RIGHT]},   // 右前电机缩放系数
+	{"MOT_SCALE_RL", &motScale[MOTOR_REAR_LEFT]},     // 左后电机缩放系数
+	{"MOT_SCALE_RR", &motScale[MOTOR_REAR_RIGHT]},    // 右后电机缩放系数
+	{"MOT_OFF_FL",   &motOffset[MOTOR_FRONT_LEFT]},    // 左前电机偏移量（默认 0.0）
+	{"MOT_OFF_FR",   &motOffset[MOTOR_FRONT_RIGHT]},   // 右前电机偏移量
+	{"MOT_OFF_RL",   &motOffset[MOTOR_REAR_LEFT]},     // 左后电机偏移量
+	{"MOT_OFF_RR",   &motOffset[MOTOR_REAR_RIGHT]},    // 右后电机偏移量
 
 	// ===== 遥控（通道校准）=====
 	// 原始 RC 信号经校准转换为归一化值（-1~1 或 0~1）。

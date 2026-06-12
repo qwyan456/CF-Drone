@@ -72,6 +72,27 @@
 float motThrMin = 0.10f;  // 推力下限（摇杆最低位的输出），可通过参数 MOT_THR_MIN 调节
 float motThrMax = 0.9f;   // 推力上限（摇杆最高位的输出），可通过参数 MOT_THR_MAX 调节；保留 10% 余量供姿态修正
 
+// ============== 每电机补偿参数 ==============
+// 用于补偿马达/桨叶推力不一致：scale 缩放系数调整推力增益，offset 偏移量调整推力基线。
+// 公式：motor_output = motor_mixer * scale + offset
+//
+// scale > 1.0 = 该电机推力偏弱需放大；scale < 1.0 = 该电机推力偏强需缩小
+// offset > 0  = 增加该电机基线推力；offset < 0 = 减少基线推力
+// 建议步长：scale 0.05，offset 0.01
+//
+// 调整方法（串口/Web 控制台）：
+//   1. 悬停观察：松杆看飞机往哪偏
+//   2. 单电机测试：mfl/mfr/mrl/mrr 命令观察各电机转速/声音
+//   3. 缩放补偿（推力增益差异）：
+//      飞机向左滚 → 左侧电机偏强 → p MOT_SCALE_FL 0.95 或 p MOT_SCALE_RL 0.95
+//      飞机向右滚 → 右侧电机偏强 → p MOT_SCALE_FR 0.95 或 p MOT_SCALE_RR 0.95
+//   4. 偏移补偿（推力基线差异）：
+//      某电机怠速不转或转速明显低 → p MOT_OFF_xx 0.02
+//   5. 组合微调直到悬停稳
+//
+float motScale[4] = {1.0f, 1.0f, 1.0f, 1.0f};  // 每电机推力缩放系数，1.0=无补偿
+float motOffset[4] = {0.0f, 0.0f, 0.0f, 0.0f};  // 每电机推力偏移量，0=无补偿
+
 const int RAW = 0, ACRO = 1, STAB = 2, ALTHOLD = 3, AUTO = 4; // flight modes
 int mode = STAB;
 bool armed = false;
@@ -240,6 +261,11 @@ void controlTorque() {
 	motors[MOTOR_FRONT_RIGHT] = thrustTarget - torqueTarget.x - torqueTarget.y - torqueTarget.z;
 	motors[MOTOR_REAR_LEFT] = thrustTarget + torqueTarget.x + torqueTarget.y - torqueTarget.z;
 	motors[MOTOR_REAR_RIGHT] = thrustTarget - torqueTarget.x + torqueTarget.y + torqueTarget.z;
+
+	// 每电机补偿（缩放+偏移），补偿马达/桨叶推力不一致
+	for (int i = 0; i < 4; i++) {
+		motors[i] = motors[i] * motScale[i] + motOffset[i];
+	}
 
 	desaturate(motors[MOTOR_FRONT_LEFT], motors[MOTOR_FRONT_RIGHT], motors[MOTOR_REAR_LEFT], motors[MOTOR_REAR_RIGHT]);
 
