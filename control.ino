@@ -139,7 +139,7 @@ float trimPitch = 0.0f; // 俯仰配平角（rad），参数名：CTL_TRIM_PITCH
 extern const int MOTOR_REAR_LEFT, MOTOR_REAR_RIGHT, MOTOR_FRONT_RIGHT, MOTOR_FRONT_LEFT;
 extern float motors[4];
 extern float controlRoll, controlPitch, controlThrottle, controlYaw, controlMode;
-extern bool isInverted;  // safety.ino
+extern float batteryVoltage;  // battery.ino
 
 void control() {
 	interpretControls();
@@ -262,17 +262,12 @@ void controlTorque() {
 	motors[MOTOR_REAR_LEFT] = thrustTarget + torqueTarget.x + torqueTarget.y - torqueTarget.z;
 	motors[MOTOR_REAR_RIGHT] = thrustTarget - torqueTarget.x + torqueTarget.y + torqueTarget.z;
 
-	// 每电机缩放补偿（保持力矩平衡关系）
+	// 每电机补偿（缩放+偏移），补偿马达/桨叶推力不一致
 	for (int i = 0; i < 4; i++) {
-		motors[i] = motors[i] * motScale[i];
+		motors[i] = motors[i] * motScale[i] + motOffset[i];
 	}
 
 	desaturate(motors[MOTOR_FRONT_LEFT], motors[MOTOR_FRONT_RIGHT], motors[MOTOR_REAR_LEFT], motors[MOTOR_REAR_RIGHT]);
-
-	// 偏移补偿（在 desaturate 之后加，不影响力矩平衡）
-	for (int i = 0; i < 4; i++) {
-		motors[i] += motOffset[i];
-	}
 
 	motors[0] = constrain(motors[0], 0, 1);
 	motors[1] = constrain(motors[1], 0, 1);
@@ -420,44 +415,11 @@ void motcalCore(float duration, float maxCorrection, const char* label) {
 	float startTime = t;
 	float lastPrint = 0;
 	while (t - startTime < duration) {
-		// 保持主循环运行，更新 t、IMU、控制、WiFi/WebRC
-		step();
-		readIMU();
-		estimate();
-		control();
-		sendMotors();
-		readRC();
-#if WIFI_ENABLED
-		processMavlink();
-#endif
-#if WEB_RC_ENABLED
-		readWebRC();
-#endif
-
-		// 紧急中断：上锁 / 倒置 / 油门过低 / 姿态倾斜过大
-		if (!armed) {
-			print("校准中止：飞机已上锁\n");
-			return;
-		}
-		if (isInverted) {
-			print("校准中止：飞机倒置\n");
-			return;
-		}
-		if (thrustTarget < motThrMin) {
-			print("校准中止：油门过低\n");
-			return;
-		}
-		Vector up = Quaternion::rotateVector(Vector(0, 0, 1), attitude);
-		if (up.z < cosf(radians(45))) {
-			print("校准中止：姿态倾斜过大\n");
-			return;
-		}
-
 		if (t - lastPrint >= 1.0f) {
 			lastPrint = t;
 			print("  校准中... %.0f/%.0f 秒\n", t - startTime, duration);
 		}
-		delay(10); // 让出 CPU 给 WiFi 等任务
+		delay(100);
 	}
 
 	// 读取 PID 内环积分量
@@ -476,19 +438,18 @@ void motcalCore(float duration, float maxCorrection, const char* label) {
 	float yawCorrection   = constrain(yawIntegral   * yawRatePID.i   / avgThrust, -maxCorrection, maxCorrection);
 
 	// 按混控矩阵的逆，将三轴修正分配到各电机
-	// 混控：FL=+roll-pitch+yaw, FR=-roll-pitch-yaw, RL=+roll+pitch-yaw, RR=-roll+pitch+yaw
 	float corrections[4] = {
-		+rollCorrection - pitchCorrection + yawCorrection,   // FL
-		-rollCorrection - pitchCorrection - yawCorrection,   // FR
-		+rollCorrection + pitchCorrection - yawCorrection,   // RL
-		-rollCorrection + pitchCorrection + yawCorrection    // RR
+		+rollCorrection + pitchCorrection + yawCorrection,   // FL
+		-rollCorrection + pitchCorrection - yawCorrection,   // FR
+		+rollCorrection - pitchCorrection - yawCorrection,   // RL
+		-rollCorrection - pitchCorrection + yawCorrection    // RR
 	};
 
 	print("\n----- 校准结果 -----\n");
 	for (int i = 0; i < 4; i++) {
 		motScale[i] = constrain(motScale[i] + corrections[i], 0.7f, 1.3f);
 		if (fabsf(motScale[i] - 1.0f) > 0.02f) {
-			motOffset[i] = constrain((motScale[i] - 1.0f) * motThrMin * 0.5f, -0.05f, 0.05f);
+			motOffset[i] = (motScale[i] - 1.0f) * motThrMin * 0.5f;
 		} else {
 			motOffset[i] = 0.0f;
 		}

@@ -31,7 +31,7 @@ void controlRates();
 void controlTorque();
 
 // 辅助函数
-const char* getModeName();
+const char* getModeName(int mode);
 
 // 外部函数声明
 bool isUsingWebRC();
