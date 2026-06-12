@@ -103,7 +103,7 @@ Parameter parameters[] = {
 	// ===== IMU（陀螺仪偏置滤波）=====
 	// 陀螺仪静态偏置通过低通滤波器（指数移动平均）在上电初始化时估计。
 	// alpha 越小滤波越强（收敛越慢），越大收敛越快但对振动噪声更敏感。
-	{"IMU_GYRO_BIAS_A", &gyroBiasFilter.alpha}, // 陀螺偏置低通滤波器系数 alpha（0~1）
+	{"IMU_GYRO_BIAS", &gyroBiasFilter.alpha}, // 陀螺偏置低通滤波器系数 alpha（0~1）
 
 	// ===== IMU（加速度计标定）=====
 	// 出厂或重新安装后需对加速度计进行六面标定，结果存入以下参数。
@@ -111,16 +111,16 @@ Parameter parameters[] = {
 	{"IMU_ACC_BIAS_X", &accBias.x},  // 加速度计 X 轴零偏（m/s²）
 	{"IMU_ACC_BIAS_Y", &accBias.y},  // 加速度计 Y 轴零偏（m/s²）
 	{"IMU_ACC_BIAS_Z", &accBias.z},  // 加速度计 Z 轴零偏（m/s²）
-	{"IMU_ACC_SCALE_X", &accScale.x}, // 加速度计 X 轴增益校正因子（无量纲，理想值为 1.0）
-	{"IMU_ACC_SCALE_Y", &accScale.y}, // 加速度计 Y 轴增益校正因子
-	{"IMU_ACC_SCALE_Z", &accScale.z}, // 加速度计 Z 轴增益校正因子
+	{"IMU_ACC_SC_X", &accScale.x}, // 加速度计 X 轴增益校正因子（无量纲，理想值为 1.0）
+	{"IMU_ACC_SC_Y", &accScale.y}, // 加速度计 Y 轴增益校正因子
+	{"IMU_ACC_SC_Z", &accScale.z}, // 加速度计 Z 轴增益校正因子
 
 	// ===== 姿态估计 =====
 	// 采用互补滤波：陀螺仪积分提供高频动态，加速度计提供低频重力修正。
 	{"EST_ACC_WEIGHT",   &accWeight},          // 加速度计对姿态的修正权重（0~1），越大修正越强，但对振动越敏感
 	{"EST_RATES_LPF_A",  &ratesFilter.alpha},  // 角速率低通滤波器系数 alpha（0~1），越小截止频率越低（约 40Hz@0.2）
 	{"EST_LVL_GATE_THR", &levelGateThreshold}, // 摇杆门控阈值（0~1），摇杆偏转超过此比例时 applyLevel 权重渐变为零，防止打杆后松杆漂移
-	{"EST_LVL_BIAS_GAIN",&levelBiasGain},      // Mahony I 项增益：重力误差积分进虚拟陀螺偏置的速率，越大收敛越快（约 30s@0.00002）
+	{"EST_LVL_BIAS_G",   &levelBiasGain},      // Mahony I 项增益：重力误差积分进虚拟陀螺偏置的速率，越大收敛越快（约 30s@0.00002）
 
 	// ===== 电机（引脚配置）=====
 	// 修改后立即调用 setupMotors() 重新初始化 LEDC 通道，无需重启。
@@ -204,8 +204,8 @@ Parameter parameters[] = {
 	{"MAV_RATE_FAST", &telemetryFast.rate}, // 快速遥测发送频率（Hz），用于姿态、角速率等高频数据
 
 	// ===== 故障保护 =====
-	{"SF_RC_LOSS_TIME",  &rcLossTimeout}, // RC 信号丢失超时阈值（秒），超时后进入自动下降模式
-	{"SF_DESCEND_TIME",  &descendTime},   // 自动下降至油门归零所需时间（秒），越小下降越快
+	{"SF_RC_LOSS_T",  &rcLossTimeout}, // RC 信号丢失超时阈值（秒），超时后进入自动下降模式
+	{"SF_DESCEND_T",  &descendTime},   // 自动下降至油门归零所需时间（秒），越小下降越快
 };
 
 void setupParameters() {
