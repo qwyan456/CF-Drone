@@ -31,8 +31,8 @@ const char* motd =
 "p MOT_PIN_FL 14 - 参数设置示例，前左电机引脚为14\n"
 "preset - 重置参数存储，设置参数后运行此命令\n"
 "mfr, mfl, mrr, mrl - 测试马达 (马达会全速运转，为了安全不要装桨叶！！！)\n"
-"motcal ground - L1地面静态校准(拆桨！桌面！)\n"
-"motcal hover - L2悬停自动校准(先悬停松杆)\n"
+"motcal quick - L1粗调(2秒快速校准，适合差异大时)\n"
+"motcal hover - L2精调(5秒悬停校准，精度更高)\n"
 "ca - 校准陀螺仪加速度计\n"
 "ps - 显示pitch/roll/yaw姿态\n"
 "cr - 校准RC遥控器\n"
@@ -177,12 +177,12 @@ void doCommand(String str, bool echo = false) {
 	} else if (command == "mrl") {
 		testMotor(MOTOR_REAR_LEFT);
 	} else if (command == "motcal") {
-		if (arg0 == "ground") {
-			motcalGround();
+		if (arg0 == "quick") {
+			motcalQuick();
 		} else if (arg0 == "hover") {
 			motcalHover();
 		} else {
-			print("用法：motcal ground (拆桨地面校准) 或 motcal hover (悬停校准)\n");
+			print("用法：motcal quick (2秒粗调) 或 motcal hover (5秒精调)\n");
 		}
 	} else if (command == "sys") {
 #ifdef ESP32
