@@ -369,3 +369,233 @@ void interpretWebRC() {
 	}
 }
 #endif
+
+// ============== 电机自动校准 ==============
+
+// L1 地面静态校准：拆桨放桌面，逐个电机发送相同油门，用陀螺仪感受力矩差异
+// 原理：四轴X型混控中，每个电机对 roll/pitch/yaw 三轴力矩的贡献是固定的。
+//       给单个电机加推力 → 陀螺仪检测到角速度变化 → 可推算该电机在各轴上的实际推力效果。
+//       对4个电机分别测量后，对比理论值即可算出每电机的 scale 和 offset。
+//
+// X型混控矩阵（电机 → 力矩）：
+//   FL: +roll, -pitch, +yaw
+//   FR: -roll, -pitch, -yaw
+//   RL: +roll, +pitch, -yaw
+//   RR: -roll, +pitch, +yaw
+//
+// 若某电机推力偏弱，其贡献的力矩就偏小，PID 内环 I 项会积分出补偿量。
+// 我们直接测量各电机单独运行时产生的角速率响应，反推推力差异。
+
+void motcalGround() {
+	print("===== L1 地面静态校准 =====\n");
+	print("请确认：已拆桨！飞机已放平在桌面上！\n");
+	print("3秒后开始...\n");
+	pause(3);
+
+	// 先确保 IMU 稳定
+	readIMU();
+	step();
+	estimate();
+
+	const float testThrust = 0.3f;    // 测试油门（不要太高，MOSFET直驱时0.3足够感受到力矩）
+	const int testDurationMs = 800;   // 每个电机测试持续毫秒数
+	const int settleMs = 500;         // 电机停止后等待稳定毫秒数
+	const int sampleCount = 200;      // 每个电机采样次数
+
+	// 记录每个电机单独运行时，陀螺仪感受到的角速率积分（= 角度变化量）
+	// 角速率积分 ∝ 推力产生的力矩 × 时间
+	Vector gyroIntegral[4] = {Vector(0,0,0), Vector(0,0,0), Vector(0,0,0), Vector(0,0,0)};
+
+	for (int mot = 0; mot < 4; mot++) {
+		print("测试电机 %d/%d...\n", mot + 1, 4);
+
+		// 清零所有电机
+		for (int i = 0; i < 4; i++) motors[i] = 0;
+		sendMotors();
+
+		// 等待静止
+		delay(settleMs);
+
+		// 记录初始陀螺仪读数（减去静态偏置）
+		readIMU();
+		step();
+		estimate();
+
+		// 启动目标电机
+		motors[mot] = testThrust;
+		sendMotors();
+		delay(50); // 等待电机启动
+
+		// 采样陀螺仪，累加角速率
+		Vector sum(0, 0, 0);
+		for (int s = 0; s < sampleCount; s++) {
+			readIMU();
+			step();
+			estimate();
+			sum = sum + rates; // rates 是滤波后的角速率（已减去陀螺偏置）
+			delay(1);
+		}
+
+		gyroIntegral[mot] = sum / sampleCount; // 平均角速率（rad/s）
+
+		// 停止电机
+		motors[mot] = 0;
+		sendMotors();
+		delay(settleMs);
+
+		print("  电机%d: roll=%.4f pitch=%.4f yaw=%.4f rad/s\n",
+			mot, gyroIntegral[mot].x, gyroIntegral[mot].y, gyroIntegral[mot].z);
+	}
+
+	// ---- 分析：用角速率响应反推 scale ----
+	// 理论上，4个电机推力相同时：
+	//   FL 和 RL 的 roll 响应应相同（都是+roll方向）
+	//   FR 和 RR 的 roll 响应应相同（都是-roll方向）
+	//   FL 和 FR 的 pitch 响应应相同（都是-pitch方向）
+	//   RL 和 RR 的 pitch 响应应相同（都是+pitch方向）
+	//
+	// 实际做法：取每个电机 roll/pitch/yaw 三个分量的绝对值作为"实际推力效果"，
+	//           与4个电机的均值比较，得出 scale。
+
+	print("\n----- 校准结果 -----\n");
+
+	// 计算每个电机的"推力效果"（取roll/pitch/yaw响应的平均绝对值）
+	float effect[4];
+	for (int i = 0; i < 4; i++) {
+		effect[i] = (fabsf(gyroIntegral[i].x) + fabsf(gyroIntegral[i].y) + fabsf(gyroIntegral[i].z)) / 3.0f;
+	}
+
+	float avgEffect = (effect[0] + effect[1] + effect[2] + effect[3]) / 4.0f;
+
+	if (avgEffect < 0.001f) {
+		print("警告：陀螺仪响应过小，请确认已拆桨并放平桌面，或调高测试油门\n");
+		print("校准中止。可尝试：p MOT_THR_MIN 0.2 后重试\n");
+		return;
+	}
+
+	for (int i = 0; i < 4; i++) {
+		// scale = 理论效果 / 实际效果 = avg / effect
+		// 但我们要的是"让弱电机放大输出"，所以 scale = avg / effect
+		float newScale = avgEffect / effect[i];
+		// 限制 scale 在合理范围 [0.7, 1.3]
+		newScale = constrain(newScale, 0.7f, 1.3f);
+		motScale[i] = newScale;
+		print("  电机%d: effect=%.4f scale=%.3f\n", i, effect[i], newScale);
+	}
+
+	// offset: 基于scale的启发式估算
+	// 如果 scale > 1，说明电机偏弱，给一点 offset 补偿低端推力
+	for (int i = 0; i < 4; i++) {
+		if (motScale[i] > 1.02f) {
+			motOffset[i] = (motScale[i] - 1.0f) * motThrMin * 0.5f;
+		} else if (motScale[i] < 0.98f) {
+			motOffset[i] = (motScale[i] - 1.0f) * motThrMin * 0.5f;
+		} else {
+			motOffset[i] = 0.0f;
+		}
+		print("  电机%d: offset=%.3f\n", i, motOffset[i]);
+	}
+
+	print("\n参数已更新，将在上锁后自动保存到 Flash。\n");
+	print("如需微调：p MOT_SCALE_FL <值> / p MOT_OFF_FL <值>\n");
+	print("如需重新校准：motcal ground\n");
+	print("===== L1 校准完成 =====\n");
+}
+
+// L2 悬停自动校准：悬停松杆3~5秒，根据各轴PID积分量算出补偿值
+// 原理：悬停松杆后，如果某方向持续漂移，PID 内环 I 项会积分出补偿量。
+//       这个积分量直接反映了各轴力矩的恒定偏差，可转换为 motScale/motOffset 修正值。
+//
+// 注意：飞机不需要完全静止，漂一点没关系，算法用的是积分均值。
+
+void motcalHover() {
+	print("===== L2 悬停自动校准 =====\n");
+
+	if (!armed) {
+		print("错误：请先解锁并悬停后再执行此命令\n");
+		return;
+	}
+	if (mode != STAB) {
+		print("错误：请切换到 STAB（自稳）模式后再执行\n");
+		return;
+	}
+	if (thrustTarget < motThrMin) {
+		print("错误：油门过低，请先推油门悬停\n");
+		return;
+	}
+
+	print("请松开摇杆，保持悬停 5 秒...\n");
+	print("飞机会轻微漂移，这是正常的，算法会自动计算补偿\n");
+
+	// 重置内环 PID 积分，从零开始记录
+	rollRatePID.reset();
+	pitchRatePID.reset();
+	yawRatePID.reset();
+
+	// 记录 5 秒内的 PID 积分累积
+	const float duration = 5.0f;
+	float startTime = t;
+
+	// 让主循环继续运行（control() 在 loop() 中被调用），
+	// 我们只记录积分量，不干预控制
+	// 每秒打印进度
+	float lastPrint = 0;
+	while (t - startTime < duration) {
+		if (t - lastPrint >= 1.0f) {
+			lastPrint = t;
+			print("  校准中... %.0f/%.0f 秒\n", t - startTime, duration);
+		}
+		delay(100);
+	}
+
+	// 读取 PID 内环积分量
+	// integral 是误差×时间的累积，正值 = 实际角速率低于目标（电机推力不足导致旋转慢）
+	float rollIntegral  = rollRatePID.integral;   // +roll 方向的积分（FL/RL 不足 或 FR/RR 过强）
+	float pitchIntegral = pitchRatePID.integral;   // +pitch 方向的积分（RL/RR 不足 或 FL/FR 过强）
+	float yawIntegral   = yawRatePID.integral;     // +yaw 方向的积分（FL/RR 不足 或 FR/RL 过强）
+
+	print("\n----- 积分数据 -----\n");
+	print("  roll I: %.4f  pitch I: %.4f  yaw I: %.4f\n", rollIntegral, pitchIntegral, yawIntegral);
+
+	// ---- 将积分量转换为电机补偿 ----
+	// 混控矩阵（力矩 → 电机）：
+	//   FL = thrust + roll - pitch + yaw
+	//   FR = thrust - roll - pitch - yaw
+	//   RL = thrust + roll + pitch - yaw
+	//   RR = thrust - roll + pitch + yaw
+	//
+	// 逆推：将三轴修正按混控矩阵的逆分配到各电机
+	float avgThrust = thrustTarget;
+	float scaleStep = 0.1f;  // 每次校准最大调整10%，防止过调
+
+	// roll 积分 > 0：+roll 方向推力不足 → FL/RL 需增大 或 FR/RR 需减小
+	float rollCorrection = constrain(rollIntegral * rollRatePID.i / avgThrust, -scaleStep, scaleStep);
+	// pitch 积分 > 0：+pitch 方向推力不足 → RL/RR 需增大 或 FL/FR 需减小
+	float pitchCorrection = constrain(pitchIntegral * pitchRatePID.i / avgThrust, -scaleStep, scaleStep);
+	// yaw 积分 > 0：+yaw 方向推力不足 → FL/RR 需增大 或 FR/RL 需减小
+	float yawCorrection = constrain(yawIntegral * yawRatePID.i / avgThrust, -scaleStep, scaleStep);
+
+	// 按混控矩阵的逆，将三轴修正分配到各电机
+	float corrections[4] = {
+		+rollCorrection + pitchCorrection + yawCorrection,   // FL
+		-rollCorrection + pitchCorrection - yawCorrection,   // FR
+		+rollCorrection - pitchCorrection - yawCorrection,   // RL
+		-rollCorrection - pitchCorrection + yawCorrection    // RR
+	};
+
+	print("\n----- 校准结果 -----\n");
+	for (int i = 0; i < 4; i++) {
+		motScale[i] = constrain(motScale[i] + corrections[i], 0.7f, 1.3f);
+		// 同步更新 offset
+		if (motScale[i] > 1.02f) {
+			motOffset[i] = (motScale[i] - 1.0f) * motThrMin * 0.5f;
+		} else if (motScale[i] < 0.98f) {
+			motOffset[i] = (motScale[i] - 1.0f) * motThrMin * 0.5f;
+		}
+		print("  电机%d: scale=%.3f offset=%.3f\n", i, motScale[i], motOffset[i]);
+	}
+
+	print("\n参数已更新，上锁后自动保存到 Flash。\n");
+	print("可重复执行 motcal hover 逐步收敛，直到悬停稳定。\n");
+	print("===== L2 校准完成 =====\n");
+}
