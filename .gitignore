@@ -2,3 +2,6 @@ build/*
 docs/*
 .github/*
 .vscode/*
+# 压缩和临时文件
+*.b64
+*.bin.gz
